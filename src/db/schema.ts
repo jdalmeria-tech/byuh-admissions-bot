@@ -57,11 +57,24 @@ export const byuh_document_chunks = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// Sessions
+// One row per anonymous site visitor, identified by an HTTP-only cookie.
+// This lets us group conversations by visitor without requiring login.
+// ---------------------------------------------------------------------------
+export const byuh_sessions = pgTable('byuh_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
 // Conversations
 // One row per chat session a user has with the bot.
 // ---------------------------------------------------------------------------
 export const byuh_conversations = pgTable('byuh_conversations', {
   id: uuid('id').primaryKey().defaultRandom(),
+  sessionId: uuid('session_id')
+    .notNull()
+    .references(() => byuh_sessions.id, { onDelete: 'cascade' }),
   title: text('title'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
@@ -101,9 +114,17 @@ export const chunksRelations = relations(byuh_document_chunks, ({ one }) => ({
   }),
 }));
 
+export const sessionsRelations = relations(byuh_sessions, ({ many }) => ({
+  conversations: many(byuh_conversations),
+}));
+
 export const conversationsRelations = relations(
   byuh_conversations,
-  ({ many }) => ({
+  ({ one, many }) => ({
+    session: one(byuh_sessions, {
+      fields: [byuh_conversations.sessionId],
+      references: [byuh_sessions.id],
+    }),
     messages: many(byuh_messages),
   })
 );
